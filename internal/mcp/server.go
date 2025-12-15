@@ -15,6 +15,14 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// truncate safely truncates a string to the specified length.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
 // Server represents the MCP server for DevOps operations.
 type Server struct {
 	mcpServer *server.MCPServer
@@ -176,10 +184,10 @@ func (s *Server) handleGetRecentDeployments(ctx context.Context, request mcp.Cal
 	// Build deployment report
 	var result string
 	for i, d := range deployments {
-		result += fmt.Sprintf("%d. Deployment %s\n", i+1, d.ID[:8])
+		result += fmt.Sprintf("%d. Deployment %s\n", i+1, truncate(d.ID, 8))
 		result += fmt.Sprintf("   Repository: %s\n", d.RepoName)
 		result += fmt.Sprintf("   Branch: %s\n", d.Branch)
-		result += fmt.Sprintf("   Commit: %s\n", d.CommitSHA[:8])
+		result += fmt.Sprintf("   Commit: %s\n", truncate(d.CommitSHA, 8))
 		result += fmt.Sprintf("   Status: %s\n", d.Status)
 		result += fmt.Sprintf("   Time: %s\n", d.CreatedAt.Format(time.RFC3339))
 		result += "\n"
@@ -205,7 +213,7 @@ func (s *Server) handleVerifyCommitStatus(ctx context.Context, request mcp.CallT
 	}
 
 	if len(deployments) == 0 {
-		return mcp.NewToolResultText(fmt.Sprintf("No deployment records found for commit %s", commitSHA[:8])), nil
+		return mcp.NewToolResultText(fmt.Sprintf("No deployment records found for commit %s", truncate(commitSHA, 8))), nil
 	}
 
 	// Get the most recent deployment for this commit
@@ -332,10 +340,10 @@ func (s *Server) handleDeploymentSummaryResource(ctx context.Context, request mc
 			break
 		}
 		recent = append(recent, map[string]interface{}{
-			"id":         d.ID[:8],
+			"id":         truncate(d.ID, 8),
 			"repo":       d.RepoName,
 			"branch":     d.Branch,
-			"commit":     d.CommitSHA[:8],
+			"commit":     truncate(d.CommitSHA, 8),
 			"status":     d.Status,
 			"created_at": d.CreatedAt.Format(time.RFC3339),
 		})

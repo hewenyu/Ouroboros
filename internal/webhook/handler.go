@@ -17,6 +17,14 @@ import (
 	"github.com/hewenyu/Ouroboros/internal/database"
 )
 
+// truncate safely truncates a string to the specified length.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
 var (
 	// ErrInvalidSignatureFormat is returned when the signature header has an invalid format.
 	ErrInvalidSignatureFormat = errors.New("invalid signature format")
@@ -170,7 +178,7 @@ func (ep *EventProcessor) processEvent(workerID int, event WorkflowRunPayload) {
 	}
 
 	log.Printf("[Worker %d] Processed deployment for commit %s: %s",
-		workerID, event.WorkflowRun.HeadSHA[:8], deploymentLog.Status)
+		workerID, truncate(event.WorkflowRun.HeadSHA, 8), deploymentLog.Status)
 }
 
 // Enqueue adds an event to the processing queue.

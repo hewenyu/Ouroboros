@@ -20,6 +20,14 @@ const (
 	LabelComposeService = "com.docker.compose.service"
 )
 
+// truncate safely truncates a string to the specified length.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
 // Manager handles Docker operations.
 type Manager struct {
 	cli *client.Client
@@ -176,12 +184,12 @@ func (m *Manager) VerifyDeployment(commitSHA string, serviceName string) (bool, 
 
 		if c.CommitSHA != "" && c.CommitSHA != commitSHA {
 			return false, fmt.Sprintf("Container %s has different commit SHA: expected %s, got %s",
-				c.ContainerName, commitSHA[:8], c.CommitSHA[:8]), nil
+				c.ContainerName, truncate(commitSHA, 8), truncate(c.CommitSHA, 8)), nil
 		}
 
 		if c.CommitSHA == commitSHA {
 			return true, fmt.Sprintf("Container %s is running with correct commit SHA: %s",
-				c.ContainerName, commitSHA[:8]), nil
+				c.ContainerName, truncate(commitSHA, 8)), nil
 		}
 	}
 
@@ -230,14 +238,30 @@ func (m *Manager) GetContainerLogs(ctx context.Context, containerID string, tail
 	}
 	defer reader.Close()
 
-	// Read logs (simplified - in production would handle multiplexed stream)
-	buf := make([]byte, 32*1024)
+	// Docker logs use a multiplexed stream format:
+	// - First 4 bytes: stream type (1=stdout, 2=stderr)
+	// - Next 4 bytes: payload size (big-endian uint32)
+	// - Remaining bytes: actual log content
 	var logs strings.Builder
+	header := make([]byte, 8)
 	for {
-		n, err := reader.Read(buf)
+		// Read the 8-byte header
+		_, err := reader.Read(header)
+		if err != nil {
+			break
+		}
+
+		// Get the payload size from bytes 4-7 (big-endian uint32)
+		size := uint32(header[4])<<24 | uint32(header[5])<<16 | uint32(header[6])<<8 | uint32(header[7])
+		if size == 0 {
+			continue
+		}
+
+		// Read the actual log content
+		payload := make([]byte, size)
+		n, err := reader.Read(payload)
 		if n > 0 {
-			// Skip the 8-byte header for each log entry
-			logs.Write(buf[:n])
+			logs.Write(payload[:n])
 		}
 		if err != nil {
 			break
