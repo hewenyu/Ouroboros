@@ -121,9 +121,24 @@ func main() {
 		case "sse":
 			// Run MCP server on SSE transport
 			sseServer := server.NewSSEServer(mcpSrv.MCPServer())
+
+			// Wrap with authentication middleware if token is configured
+			var handler http.Handler = sseServer
+			if cfg.MCPAuthToken != "" {
+				handler = authMiddleware(sseServer, cfg.MCPAuthToken)
+				log.Println("MCP SSE authentication enabled")
+			} else {
+				log.Println("Warning: MCP SSE authentication is disabled (MCP_AUTH_TOKEN not set)")
+			}
+
+			mcpHTTPServer := &http.Server{
+				Addr:    ":" + cfg.MCPSSEPort,
+				Handler: handler,
+			}
+
 			go func() {
 				log.Printf("Starting MCP SSE server on port %s", cfg.MCPSSEPort)
-				if err := sseServer.Start(":" + cfg.MCPSSEPort); err != nil {
+				if err := mcpHTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					log.Fatalf("MCP SSE server error: %v", err)
 				}
 			}()
@@ -134,6 +149,7 @@ func main() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			httpServer.Shutdown(ctx)
+			mcpHTTPServer.Shutdown(ctx)
 
 		default:
 			log.Fatalf("Unknown MCP transport: %s", cfg.MCPTransport)
@@ -160,4 +176,30 @@ func versionHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"version":"%s","build_time":"%s"}`, Version, BuildTime)
+}
+
+// authMiddleware validates Bearer token authentication for MCP SSE server.
+func authMiddleware(next http.Handler, token string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Unauthorized: missing Authorization header", http.StatusUnauthorized)
+			return
+		}
+
+		// Check for Bearer token format
+		const bearerPrefix = "Bearer "
+		if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
+			http.Error(w, "Unauthorized: invalid Authorization header format", http.StatusUnauthorized)
+			return
+		}
+
+		providedToken := authHeader[len(bearerPrefix):]
+		if providedToken != token {
+			http.Error(w, "Unauthorized: invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

@@ -25,8 +25,8 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Expected MCPEnabled to be true by default")
 	}
 
-	if cfg.MCPTransport != "stdio" {
-		t.Errorf("Expected default MCPTransport 'stdio', got '%s'", cfg.MCPTransport)
+	if cfg.MCPTransport != "sse" {
+		t.Errorf("Expected default MCPTransport 'sse', got '%s'", cfg.MCPTransport)
 	}
 }
 
