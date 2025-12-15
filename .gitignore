@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+devops-agent
 
 # Test binary, built with `go test -c`
 *.test
@@ -34,3 +35,11 @@ go.work.sum
 # some custom folders
 .prd/
 .claude/
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Binary in root
+/server
