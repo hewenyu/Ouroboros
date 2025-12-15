@@ -9,6 +9,7 @@ Ouroboros is a single-binary Go service designed as an AI-native infrastructure 
 - **Docker SDK Integration**: Native container status checking, health monitoring, and log retrieval
 - **SQLite with WAL Mode**: High-performance local data persistence with concurrent read/write support
 - **MCP Protocol Support**: Exposes DevOps tools and resources for AI agent interaction
+- **MCP Authentication**: Bearer token authentication for secure remote MCP access via SSE
 
 ## Architecture
 
@@ -53,14 +54,14 @@ make build-static
 ### Run
 
 ```bash
-# Run with default settings (MCP on stdio)
-./devops-agent
+# Run with default settings (MCP on SSE with authentication)
+MCP_AUTH_TOKEN=your-secret-token ./devops-agent
 
 # Run with HTTP only (no MCP)
 MCP_ENABLED=false ./devops-agent
 
-# Run with SSE transport for remote MCP access
-MCP_TRANSPORT=sse ./devops-agent
+# Run with stdio transport for local MCP access
+MCP_TRANSPORT=stdio ./devops-agent
 ```
 
 ### Configuration
@@ -74,8 +75,119 @@ Configuration is done via environment variables:
 | `DATABASE_PATH` | SQLite database file path | `data.db` |
 | `DOCKER_HOST` | Docker daemon socket | `unix:///var/run/docker.sock` |
 | `MCP_ENABLED` | Enable MCP server | `true` |
-| `MCP_TRANSPORT` | MCP transport (stdio/sse) | `stdio` |
+| `MCP_TRANSPORT` | MCP transport (stdio/sse) | `sse` |
 | `MCP_SSE_PORT` | SSE transport port | `8081` |
+| `MCP_AUTH_TOKEN` | Bearer token for MCP SSE authentication | (empty) |
+
+## AI Agent Integration
+
+### Claude Code Integration
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) supports MCP (Model Context Protocol) for connecting to external tools and data sources. To connect Ouroboros with Claude Code:
+
+#### SSE Transport Configuration (Recommended)
+
+1. Start Ouroboros with SSE transport and authentication:
+   ```bash
+   MCP_AUTH_TOKEN=your-secret-token ./devops-agent
+   ```
+
+2. Configure Claude Code to connect to Ouroboros by adding to your MCP settings:
+   ```json
+   {
+     "mcpServers": {
+       "ouroboros": {
+         "url": "http://your-server:8081/sse",
+         "transport": "sse",
+         "headers": {
+           "Authorization": "Bearer your-secret-token"
+         }
+       }
+     }
+   }
+   ```
+
+#### Stdio Transport Configuration (Local Development)
+
+For local development, you can use stdio transport:
+
+1. Configure Claude Code with stdio transport:
+   ```json
+   {
+     "mcpServers": {
+       "ouroboros": {
+         "command": "/path/to/devops-agent",
+         "args": [],
+         "env": {
+           "MCP_TRANSPORT": "stdio",
+           "DATABASE_PATH": "/path/to/data.db"
+         }
+       }
+     }
+   }
+   ```
+
+### OpenAI Codex Integration
+
+[OpenAI Codex](https://platform.openai.com/docs/guides/tools-remote-mcp) supports MCP for extending AI capabilities with external tools. To connect Ouroboros with Codex:
+
+#### SSE Transport Configuration (Recommended)
+
+1. Start Ouroboros with SSE transport and authentication:
+   ```bash
+   MCP_AUTH_TOKEN=your-secret-token ./devops-agent
+   ```
+
+2. Configure Codex to connect to Ouroboros by adding to your MCP configuration:
+   ```json
+   {
+     "mcpServers": {
+       "ouroboros": {
+         "type": "sse",
+         "url": "http://your-server:8081/sse",
+         "headers": {
+           "Authorization": "Bearer your-secret-token"
+         }
+       }
+     }
+   }
+   ```
+
+#### Stdio Transport Configuration (Local Development)
+
+For local development with Codex CLI:
+
+1. Configure Codex with stdio transport:
+   ```json
+   {
+     "mcpServers": {
+       "ouroboros": {
+         "type": "stdio",
+         "command": "/path/to/devops-agent",
+         "args": [],
+         "env": {
+           "MCP_TRANSPORT": "stdio",
+           "DATABASE_PATH": "/path/to/data.db"
+         }
+       }
+     }
+   }
+   ```
+
+### Available MCP Capabilities
+
+Once connected, AI agents can use the following tools:
+
+- **check_deployment_health**: Check Docker service status and health
+- **get_recent_deployments**: Retrieve recent deployment records
+- **verify_commit_status**: Verify if a specific commit has been deployed
+- **list_containers**: List all Docker containers with their status
+- **get_container_logs**: Get logs from a specific Docker container
+
+And access these resources:
+
+- **logs://system/audit**: System audit trail of tool invocations
+- **stats://deployments/summary**: Summary statistics of deployments
 
 ## API Endpoints
 
@@ -148,6 +260,9 @@ make fmt
 ## Security Considerations
 
 - All webhook requests are validated using HMAC-SHA256 with constant-time comparison
+- MCP SSE transport supports Bearer token authentication via `MCP_AUTH_TOKEN`
+  - **Important**: Always set `MCP_AUTH_TOKEN` when exposing MCP over SSE in production
+  - Without authentication, anyone with network access can invoke MCP tools
 - SQLite database uses WAL mode for concurrent access
 - Docker socket access requires appropriate permissions
 - MCP stdio transport keeps all communication local to the process
