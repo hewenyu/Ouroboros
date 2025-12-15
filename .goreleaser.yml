@@ -1,0 +1,168 @@
+# GoReleaser configuration for Ouroboros DevOps Agent
+# This configuration handles multi-platform builds with CGO enabled (required for SQLite)
+
+version: 2
+
+before:
+  hooks:
+    - go mod download
+    - go mod tidy
+
+builds:
+  - id: devops-agent
+    main: ./cmd/server
+    binary: devops-agent
+    env:
+      - CGO_ENABLED=1
+
+    # Version and build time injection
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.BuildTime={{.Date}}
+
+    # Multi-platform build targets
+    goos:
+      - linux
+      - darwin
+      - windows
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Exclude unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+    # CGO cross-compilation settings
+    overrides:
+      # Linux AMD64
+      - goos: linux
+        goarch: amd64
+        env:
+          - CC=gcc
+          - CXX=g++
+
+      # Linux ARM64
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+
+      # macOS AMD64 (Intel)
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CC=o64-clang
+          - CXX=o64-clang++
+
+      # macOS ARM64 (Apple Silicon)
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CC=oa64-clang
+          - CXX=oa64-clang++
+
+      # Windows AMD64
+      - goos: windows
+        goarch: amd64
+        env:
+          - CC=x86_64-w64-mingw32-gcc
+          - CXX=x86_64-w64-mingw32-g++
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+    format_overrides:
+      - goos: windows
+        format: zip
+
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - 'typo'
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Enhancements
+      regexp: '^.*?(refactor|perf)(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: hewenyu
+    name: Ouroboros
+
+  draft: false
+  prerelease: auto
+  mode: replace
+
+  name_template: "{{.ProjectName}} v{{.Version}}"
+
+  header: |
+    ## Release v{{.Version}} ({{.Date}})
+
+    Welcome to this new release of Ouroboros DevOps Agent!
+
+  footer: |
+    ## Installation
+
+    ### Linux / macOS
+    ```bash
+    # Download the appropriate binary for your platform
+    # Extract and move to your PATH
+    tar -xzf devops-agent_*_linux_amd64.tar.gz
+    sudo mv devops-agent /usr/local/bin/
+    ```
+
+    ### Windows
+    ```powershell
+    # Extract the zip file
+    # Add the directory to your PATH or move devops-agent.exe to a directory in PATH
+    ```
+
+    ## Verify Installation
+    ```bash
+    devops-agent -version
+    ```
+
+    ---
+    **Full Changelog**: https://github.com/hewenyu/Ouroboros/compare/{{.PreviousTag}}...{{.Tag}}
+
+# Announce new releases
+# announce:
+#   skip: false

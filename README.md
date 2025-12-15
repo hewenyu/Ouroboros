@@ -35,13 +35,32 @@ Ouroboros is a single-binary Go service designed as an AI-native infrastructure 
 
 ## Quick Start
 
-### Prerequisites
+### Installation
 
-- Go 1.21 or later
+#### Download Pre-built Binaries
+
+Download the latest release for your platform from the [Releases](https://github.com/hewenyu/Ouroboros/releases) page:
+
+- **Linux**: `devops-agent_*_linux_amd64.tar.gz` or `devops-agent_*_linux_arm64.tar.gz`
+- **macOS**: `devops-agent_*_darwin_amd64.tar.gz` (Intel) or `devops-agent_*_darwin_arm64.tar.gz` (Apple Silicon)
+- **Windows**: `devops-agent_*_windows_amd64.zip`
+
+Extract and run:
+```bash
+# Linux / macOS
+tar -xzf devops-agent_*.tar.gz
+sudo mv devops-agent /usr/local/bin/
+
+# Windows
+# Extract the zip file and add devops-agent.exe to your PATH
+```
+
+#### Build from Source
+
+**Prerequisites:**
+- Go 1.24.11 or later
 - Docker (optional, for container verification features)
 - SQLite3 (for CGO compilation)
-
-### Build
 
 ```bash
 # Build the binary
@@ -237,6 +256,24 @@ make lint
 
 # Format code
 make fmt
+```
+
+### Creating a Release
+
+See [.github/RELEASE.md](.github/RELEASE.md) for detailed release instructions.
+
+Quick steps:
+1. Update CHANGELOG.md
+2. Create and push a tag:
+   ```bash
+   git tag -a v1.0.0 -m "Release v1.0.0"
+   git push origin v1.0.0
+   ```
+3. GitHub Actions will automatically build and publish the release
+
+Test the release build locally:
+```bash
+./scripts/test-release.sh
 ```
 
 ## Project Structure
