@@ -321,10 +321,10 @@ func (s *Server) handleDeploymentSummaryResource(ctx context.Context, request mc
 
 	// Build summary
 	summary := map[string]interface{}{
-		"total":           len(deployments),
-		"by_status":       map[string]int{},
-		"recent":          []map[string]interface{}{},
-		"generated_at":    time.Now().Format(time.RFC3339),
+		"total":        len(deployments),
+		"by_status":    map[string]int{},
+		"recent":       []map[string]interface{}{},
+		"generated_at": time.Now().Format(time.RFC3339),
 	}
 
 	statusCount := make(map[string]int)
